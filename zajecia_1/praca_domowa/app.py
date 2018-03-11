@@ -26,12 +26,7 @@ def time():
 def user_agent():
     ua_string = request.headers['User-Agent']
     user_agent = parse(ua_string)
-    return '{} / {} / {} {}'.format(
-        user_agent.device.family,
-        user_agent.os.family,
-        user_agent.browser.family,
-        reduce((lambda x,y: str(x) + '.' + str(y)), user_agent.browser.version),
-    )
+    return str(user_agent)
 
 visits = 0
 
