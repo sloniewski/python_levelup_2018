@@ -1,5 +1,4 @@
 from datetime import datetime
-from functools import reduce
 
 from flask import (
     Flask,
