@@ -1,4 +1,5 @@
 from datetime import datetime
+from functools import reduce
 
 from flask import (
     Flask,
@@ -25,11 +26,20 @@ def time():
 def user_agent():
     ua_string = request.headers['User-Agent']
     user_agent = parse(ua_string)
-    return '{} / {} / {}'.format(
+    return '{} / {} / {} {}'.format(
         user_agent.device.family,
         user_agent.os.family,
         user_agent.browser.family,
+        reduce((lambda x,y: str(x) + '.' + str(y)), user_agent.browser.version),
     )
+
+visits = 0
+
+@app.route('/counter')
+def counter():
+    global visits
+    visits += 1
+    return str(visits)
 
 if __name__ == '__main__':
     app.run()
