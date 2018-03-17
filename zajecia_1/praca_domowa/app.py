@@ -16,7 +16,7 @@ def hello():
 
 
 @app.route('/now')
-def time():
+def time(methods=['GET']):
     now_object = datetime.now()
     return now_object.isoformat(sep=' ')
 
