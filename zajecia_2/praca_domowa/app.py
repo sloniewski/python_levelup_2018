@@ -24,6 +24,14 @@ def authenticate(username, password):
 
 @app.route('/login', methods=['POST'])
 def login():
+    # check if user is already logged
+    global session
+    if request.cookies.get('session_id') == session:
+        return redirect(
+            location='/hello',
+        )
+
+    # get username and password
     try:
         username = request.authorization['username']
         password = request.authorization['password']
@@ -33,6 +41,7 @@ def login():
             status=404,
         )
 
+    # authenticate user
     if authenticate(username, password):
         return redirect(
             location='/hello',
@@ -54,7 +63,9 @@ def test():
 def logout():
     global session
     session = None
-    return 'done'
+    return redirect(
+        location='/login'
+    )
 
 
 @app.route('/hello')
