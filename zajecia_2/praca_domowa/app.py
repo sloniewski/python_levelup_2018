@@ -7,12 +7,13 @@ from flask import (
     Response,
     redirect,
     render_template,
+    session
 )
 
 app = Flask(__name__)
 
-session = None
-logged_user = None
+app.secret_key = str(uuid4())
+
 fishes = {
     "id_1": {
         "who": "Znajomy",
@@ -41,18 +42,17 @@ def authenticate(username, password):
     stored_username = 'Akwarysta69'
     stored_password = 'J3si07r'
     if username == stored_username and password == stored_password:
-        global logged_user
-        logged_user = username
+        session['username'] = username
+        session['logged'] = True
         return True
     return False
 
 
 @app.route('/login', methods=['POST'])
 def login():
-    global session
 
     # check if user is already logged
-    if request.cookies.get('session_id') == str(session) and session is not None:
+    if session.get('logged') is True:
         return redirect(
             location='/hello',
         )
@@ -69,10 +69,7 @@ def login():
 
     # authenticate user
     if authenticate(username, password):
-        session_id = uuid4()
-        session = session_id
         resp = Response()
-        resp.set_cookie(key='session_id', value=str(session_id), path='/')
         resp.status_code = 301
         resp.headers.add('Location', '/hello')
         return resp
@@ -83,38 +80,39 @@ def login():
         )
 
 
-@app.route('/logout')
+@app.route('/logout', methods=['POST'])
 def logout():
-    global session
-    session = None
+    session['username'] = None
+    session['logged'] = None
     return redirect(
-        location='/login'
+        location='/hello'
     )
 
 
 @app.route('/hello')
 def hello():
-    global logged_user
-
     return render_template(
         template_name_or_list='hello.html',
-        user=logged_user,
+        user=session.get('username'),
     )
 
 
 
 def handle_GET():
     global fishes
-    return str(fishes)
+    return json.dumps(fishes)
+
 
 def handle_POST():
     global fishes
+    fish = json.loads(request.data)
 
     #generate next id
     keys = [int(key[3:]) for key in fishes.keys()]
     next_id = 'id_' + str(max(keys)+1)
-    print(next_id)
 
+    fishes[next_id] = fish
+    return json.dumps(fishes[next_id])
 
 @app.route('/fishes', methods=['GET', 'POST'])
 def handle_fishes_list():
@@ -126,19 +124,30 @@ def handle_fishes_list():
     return handlers[request.method]()
 
 
-def handle_PUT():
+def handle_GET_fish(fish_id):
+    global fishes
+    return json.dumps(fishes[fish_id], indent=4)
+
+
+def handle_PUT_fish(fish_id):
     pass
 
 
-def handle_PATCH():
-    pass
+def handle_PATCH_fish(fish_id):
+    global fishes
+    fish = json.loads(request.data)
+    fishes[fish_id] = fish
+    return json.dumps(fishes[fish_id])
 
 
-def handle_DELETE(fish_id):
-    pass
+def handle_DELETE_fish(fish_id):
+    global fishes
+    deleted_fish = fishes[fish_id]
+    del(fishes[fish_id])
+    return json.dump(deleted_fish)
 
 
-@app.route('/fishes/<int:fish_id>', methods=['GET', 'PUT', 'PATCH', 'DELETE'])
+@app.route('/fishes/<fish_id>', methods=['GET', 'PUT', 'PATCH', 'DELETE'])
 def handle_fish_object(fish_id):
     global fishes
     try:
@@ -150,12 +159,13 @@ def handle_fish_object(fish_id):
         )
 
     handler = {
-        'PUT': handle_PUT,
-        'PATCH': handle_PATCH,
-        'DELETE': handle_DELETE,
+        'GET': handle_GET_fish,
+        'PUT': handle_PUT_fish,
+        'PATCH': handle_PATCH_fish,
+        'DELETE': handle_DELETE_fish,
     }
 
-    return handler
+    return handler[request.method](fish_id)
 
 
 if __name__ == '__main__':
