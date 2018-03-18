@@ -14,6 +14,7 @@ app = Flask(__name__)
 
 app.secret_key = str(uuid4())
 
+# this global variable will substitute database for now
 fishes = {
     "id_1": {
         "who": "Znajomy",
@@ -97,22 +98,32 @@ def hello():
     )
 
 
-
 def handle_GET():
     global fishes
-    return json.dumps(fishes)
+    resp = Response(
+        response=json.dumps(fishes, indent=4),
+    )
+    resp.headers.set('Content-Type', 'application/json')
+    return resp
 
 
 def handle_POST():
+    if not session.get('logged'):
+        return Response(
+            response='401 Unauthorized',
+            status=401,
+        )
     global fishes
     fish = json.loads(request.data)
 
-    #generate next id
+    # generate next id
     keys = [int(key[3:]) for key in fishes.keys()]
     next_id = 'id_' + str(max(keys)+1)
 
+    # add new fish to dict
     fishes[next_id] = fish
     return json.dumps(fishes[next_id])
+
 
 @app.route('/fishes', methods=['GET', 'POST'])
 def handle_fishes_list():
@@ -126,25 +137,73 @@ def handle_fishes_list():
 
 def handle_GET_fish(fish_id):
     global fishes
-    return json.dumps(fishes[fish_id], indent=4)
+    resp = Response(
+        response=json.dumps(fishes[fish_id], indent=4),
+    )
+    resp.headers.set('Content-Type', 'application/json')
+    return resp
 
 
 def handle_PUT_fish(fish_id):
-    pass
-
-
-def handle_PATCH_fish(fish_id):
+    if not session.get('logged'):
+        return Response(
+            response='401 Unauthorized',
+            status=401,
+        )
     global fishes
     fish = json.loads(request.data)
     fishes[fish_id] = fish
-    return json.dumps(fishes[fish_id])
+
+    # set up response
+    resp = Response(
+        response=json.dumps(fishes[fish_id], indent=4),
+    )
+    resp.headers.set('Content-Type', 'application/json')
+    return resp
+
+
+def handle_PATCH_fish(fish_id):
+    # check for login
+    if not session.get('logged'):
+        return Response(
+            response='401 Unauthorized',
+            status=401,
+        )
+    global fishes
+    fish = fishes[fish_id]
+
+    # load request data
+    fish_data = json.loads(request.data)
+
+    # reassign values using incoming data
+    for key, value in fish_data.items():
+        fish[key]=value
+    fishes[fish_id] = fish
+
+    # set up response
+    resp = Response(
+        response=json.dumps(fishes[fish_id], indent=4),
+    )
+    resp.headers.set('Content-Type', 'application/json')
+    return resp
 
 
 def handle_DELETE_fish(fish_id):
+    if not session.get('logged'):
+        return Response(
+            response='401 Unauthorized',
+            status=401,
+        )
     global fishes
     deleted_fish = fishes[fish_id]
     del(fishes[fish_id])
-    return json.dump(deleted_fish)
+
+    # set up response
+    resp = Response(
+        response=json.dumps(deleted_fish, indent=4),
+    )
+    resp.headers.set('Content-Type', 'application/json')
+    return resp
 
 
 @app.route('/fishes/<fish_id>', methods=['GET', 'PUT', 'PATCH', 'DELETE'])
