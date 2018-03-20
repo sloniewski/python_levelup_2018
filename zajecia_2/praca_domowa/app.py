@@ -122,7 +122,13 @@ def handle_POST():
 
     # add new fish to dict
     fishes[next_id] = fish
-    return json.dumps(fishes[next_id])
+
+    # prepare response
+    resp = Response(
+        response=json.dumps(fishes[next_id], indent=4),
+    )
+    resp.headers.set('Content-Type', 'application/json')
+    return resp
 
 
 @app.route('/fishes', methods=['GET', 'POST'])
