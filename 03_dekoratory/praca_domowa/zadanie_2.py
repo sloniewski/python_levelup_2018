@@ -6,12 +6,22 @@ def validate_json(*expected_args):
     def decorator(func):
         @wraps(func)
         def wrapper(json_data, *args, **kwargs):
-            json_object = json.loads(json_data)
-            for expected_arg in expected_args:
-                if expected_arg not in json_object.keys():
-                    raise ValueError(
-                        'key {} missing in json'.format(expected_arg)
+            json_dict = json.loads(json_data)
+            missing = set(expected_args) - set(json_dict)
+            if len(missing) != 0:
+                raise ValueError(
+                    'missing data in json {}'.format(
+                        str(missing)[1:-1]
                     )
+                )
+            extra = set(json_dict) - set(expected_args)
+            if len(extra) != 0:
+                raise ValueError(
+                    'got unexpected data: {}'.format(
+                        str(extra)[1:-1]
+                    )
+                )
+
             return func(json_data, *args, **kwargs)
         return wrapper
     return decorator
