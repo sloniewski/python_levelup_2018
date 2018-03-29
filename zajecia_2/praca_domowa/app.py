@@ -49,7 +49,12 @@ def authenticate(username, password):
     return False
 
 
-@app.route('/login', methods=['POST'])
+@app.route('/', methods=['GET'])
+def default():
+    return 'United States of <b>Whatever</b>'
+
+
+@app.route('/login', methods=['GET', 'POST'])
 def login():
 
     # check if user is already logged
@@ -57,6 +62,10 @@ def login():
         return redirect(
             location='/hello',
         )
+
+    # placeholder
+    if request.method == 'GET':
+        return 'United States of <b>Whatever</b>'
 
     # get username and password
     try:
@@ -83,15 +92,22 @@ def login():
 
 @app.route('/logout', methods=['POST'])
 def logout():
+    # clear session
     session['username'] = None
     session['logged'] = None
+
+    # redirect
     return redirect(
-        location='/hello'
+        location='/',
     )
 
 
-@app.route('/hello')
+@app.route('/hello', methods=['GET'])
 def hello():
+    if not session.get('logged'):
+        return redirect(
+            location='/login',
+        )
     return render_template(
         template_name_or_list='hello.html',
         user=session.get('username'),
@@ -108,17 +124,15 @@ def handle_GET():
 
 
 def handle_POST():
-    if not session.get('logged'):
-        return Response(
-            response='401 Unauthorized',
-            status=401,
-        )
     global fishes
     fish = json.loads(request.data)
 
     # generate next id
     keys = [int(key[3:]) for key in fishes.keys()]
-    next_id = 'id_' + str(max(keys)+1)
+    if keys == []:
+        next_id = 'id_1'
+    else:
+        next_id = 'id_' + str(max(keys)+1)
 
     # add new fish to dict
     fishes[next_id] = fish
@@ -133,6 +147,10 @@ def handle_POST():
 
 @app.route('/fishes', methods=['GET', 'POST'])
 def handle_fishes_list():
+    if not session.get('logged'):
+        return redirect(
+            location='/login',
+        )
     handlers = {
         'GET': handle_GET,
         'POST': handle_POST,
@@ -151,11 +169,6 @@ def handle_GET_fish(fish_id):
 
 
 def handle_PUT_fish(fish_id):
-    if not session.get('logged'):
-        return Response(
-            response='401 Unauthorized',
-            status=401,
-        )
     global fishes
     fish = json.loads(request.data)
     fishes[fish_id] = fish
@@ -169,12 +182,6 @@ def handle_PUT_fish(fish_id):
 
 
 def handle_PATCH_fish(fish_id):
-    # check for login
-    if not session.get('logged'):
-        return Response(
-            response='401 Unauthorized',
-            status=401,
-        )
     global fishes
     fish = fishes[fish_id]
 
@@ -183,7 +190,7 @@ def handle_PATCH_fish(fish_id):
 
     # reassign values using incoming data
     for key, value in fish_data.items():
-        fish[key]=value
+        fish[key] = value
     fishes[fish_id] = fish
 
     # set up response
@@ -195,11 +202,6 @@ def handle_PATCH_fish(fish_id):
 
 
 def handle_DELETE_fish(fish_id):
-    if not session.get('logged'):
-        return Response(
-            response='401 Unauthorized',
-            status=401,
-        )
     global fishes
     deleted_fish = fishes[fish_id]
     del(fishes[fish_id])
@@ -214,6 +216,12 @@ def handle_DELETE_fish(fish_id):
 
 @app.route('/fishes/<fish_id>', methods=['GET', 'PUT', 'PATCH', 'DELETE'])
 def handle_fish_object(fish_id):
+    # check for logged user
+    if not session.get('logged'):
+        return redirect(
+            location='/login',
+        )
+
     global fishes
     try:
         fish = fishes[fish_id]
