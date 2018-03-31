@@ -44,9 +44,14 @@ def cities():
 
     page = request.args.get('page')
     if page is not None:
+        count_query = 'SELECT Count(*) FROM( {} );'.format(query)
+        count = cursor.execute(count_query, params).fetchone()[0]
+
         per_page = request.args.get('per_page')
         if per_page is None:
             per_page = 10
+
+        pages = count / per_page
 
         query += ' LIMIT :per_page OFFSET :page'
         params['per_page'] = int(per_page)
