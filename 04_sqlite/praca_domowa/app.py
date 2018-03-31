@@ -8,6 +8,8 @@ from flask import (
     request,
 )
 
+from helpers import PaginationHelper
+
 app = Flask(__name__)
 
 DATABASE = '/home/maciek/Documents/python_levelup_2018/04_sqlite/praca_domowa/db.sqlite3'
@@ -50,12 +52,17 @@ def cities():
         per_page = request.args.get('per_page')
         if per_page is None:
             per_page = 10
+        else:
+            try:
+                per_page = int(per_page)
+            except ValueError:
+                return Response(response='for oh for',status=404)
 
-        pages = count / per_page
+        offset = page
 
-        query += ' LIMIT :per_page OFFSET :page'
-        params['per_page'] = int(per_page)
-        params['page'] = int(page)
+        query += ' LIMIT :limit OFFSET :offset'
+        params['limit'] = per_page
+        params['offset'] = offset
 
     query += ';'
 
