@@ -1,6 +1,9 @@
-from _datetime import datetime
+from datetime import datetime
+from functools import (
+    reduce,
+    wraps,
+)
 import json
-from functools import reduce
 import sqlite3
 
 from flask import (
@@ -41,6 +44,20 @@ def safe_str_to_int(value):
     return value
 
 
+def jsonify_response(code):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args,**kwargs):
+            data = func(*args, **kwargs)
+            return Response(
+                status=code,
+                response=json.dumps(data, indent=4),
+                headers=[('Content-Type', 'application/json')]
+            )
+        return wrapper
+    return decorator
+
+
 class PaginationHelper:
 
     def __init__(self, items_count, items_per_page):
@@ -65,17 +82,14 @@ class PaginationHelper:
 
 
 @app.errorhandler(400)
+@jsonify_response(400)
 def bad_request(error):
-    return Response(
-        status=400, 
-        response=json.dumps(error.description, indent=4), 
-        headers=[('Content-Type', 'application/json')]
-    )
+    return error.description
 
 
 def validate_json(req, *expected_args):
-    def decorator(function):
-        def wrapper():
+    def decorator(func):
+        def wrapper(*args, **kwargs):
             try:
                 data = json.loads(req.data)
             except json.decoder.JSONDecodeError:
@@ -91,12 +105,13 @@ def validate_json(req, *expected_args):
                 abort(
                     400, {'error': 'got unexpected data: {}'.format(str(extra)[1:-1])})
 
-            return function()
+            return func(*args, **kwargs)
         return wrapper
     return decorator
 
 
 @app.route('/cities', methods=['GET'])
+@jsonify_response(200)
 def cities():
     db = get_db()
     cursor = db.cursor()
@@ -134,14 +149,11 @@ def cities():
 
     data = cursor.execute(query, params).fetchall()
     data = reduce((lambda x, y: x + y), data)
-    resp = Response(
-        response=json.dumps(data, indent=4),
-    )
-    resp.headers.set('Content-Type', 'application/json')
-    return resp
+    return data
 
 
 @app.route('/cities', methods=['POST'])
+@jsonify_response(201)
 @validate_json(request, 'country_id', 'city_name')
 def add_city():
     data = json.loads(request.data)
@@ -170,19 +182,14 @@ def add_city():
     cursor.execute(insert_query, params)
     db.commit()
 
-    return Response(
-        response=json.dumps({
-                "country_id": params['country_id'],
-                "city_name": params['city_name'],
-                "city_id": city_id
-            }, 
-            indent=4),
-        headers=[('Content-Type', 'application/json')],
-        status=201,
-    )
+    return {"country_id": params['country_id'],
+            "city_name": params['city_name'],
+            "city_id": city_id,
+            }
 
 
 @app.route('/lang_roles', methods=["GET"])
+@jsonify_response(200)
 def lang_roles():
     db = get_db()
     cursor = db.cursor()
@@ -196,11 +203,7 @@ def lang_roles():
         ) Group BY name;
     """
     data = cursor.execute(query).fetchall()
-
-    return Response(
-        response=json.dumps(data, indent=4),
-        headers=[('Content-Type', 'application/json')]
-    )
+    return data
 
 
 if __name__ == '__main__':
