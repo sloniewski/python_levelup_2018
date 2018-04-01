@@ -63,6 +63,25 @@ class PaginationHelper:
         return self.items_per_page * (page_num - 1)
 
 
+def validate_dict(data_dict, *expected_args):
+        error_list = []
+        missing = set(expected_args) - set(data_dict.keys())
+        if len(missing) != 0:
+            error_list.append(
+                'missing data in json {}'.format(
+                    str(missing)[1:-1]
+                )
+            )
+        extra = set(data_dict.keys()) - set(expected_args)
+        if len(extra) != 0:
+            error_list.append(
+                'got unexpected data: {}'.format(
+                    str(extra)[1:-1]
+                )
+            )
+        return error_list
+
+
 @app.route('/cities', methods=['GET'])
 def cities():
     db = get_db()
@@ -110,25 +129,58 @@ def cities():
 
 @app.route('/cities', methods=['POST'])
 def add_city():
-    data = json.loads(request.data)
+    error_list = {'error': []}
+
+    try:
+        data = json.loads(request.data)
+    except json.decoder.JSONDecodeError:
+        data = {}
+        error_list['error'] += ['unable to parse json']
+
+    error_list['error'] += validate_dict(data, 'country_id', 'city_name')
+
+    if error_list['error']:
+        return Response(
+            response=json.dumps(error_list, indent=4),
+            status=400,
+        )
 
     db = get_db()
     cursor = db.cursor()
+
+    country_id_query = 'SELECT country_id from country WHERE country_id = :country_id'
+    country_id_check = cursor.execute(country_id_query, {'country_id': data['country_id']}).fetchone()
+
+    if country_id_check is None:
+        return Response(
+            response=json.dumps({'error': ['wrong country_id']}, indent=4),
+            status=400,
+        )
 
     max_id_query = 'SELECT Max(city_id) FROM city;'
     city_id = int(cursor.execute(max_id_query).fetchone()[0]) + 1
 
     insert_query = 'INSERT INTO city (city_id, city, country_id, last_update) VALUES (:city_id, :city_name, :country_id, :update_date);'
 
-    params = {}
-    params['city_name'] = data['city_name']
-    params['country_id'] = data['country_id']
-    params['update_date'] = datetime.now().isoformat(sep=' ')
-    params['city_id'] = city_id
+    params = {
+        'city_name': data['city_name'],
+        'country_id': data['country_id'],
+        'update_date': datetime.now().isoformat(sep=' '),
+        'city_id': city_id,
+    }
 
-    cursor.execute(insert_query, params).fetchall()
+    cursor.execute(insert_query, params)
+    db.commit()
 
-    return str(city_id)
+    return Response(
+        response=json.dumps({
+            "country_id": params['country_id'],
+            "city_name": params['city_name'],
+            "city_id": city_id
+        }),
+        status=201,
+    )
+
 
 if __name__ == '__main__':
     app.run(debug=True)
