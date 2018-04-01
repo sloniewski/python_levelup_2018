@@ -1,5 +1,7 @@
-import sqlite3
+from _datetime import datetime
 import json
+from functools import reduce
+import sqlite3
 
 from flask import (
     Flask,
@@ -94,16 +96,39 @@ def cities():
         query += ' LIMIT :limit OFFSET :offset'
         params['limit'] = per_page
         params['offset'] = offset
-    print(params)
+
     query += ';'
 
     data = cursor.execute(query, params).fetchall()
+    data = reduce((lambda x, y: x + y), data)
     resp = Response(
         response=json.dumps(data, indent=4),
     )
     resp.headers.set('Content-Type', 'application/json')
     return resp
 
+
+@app.route('/cities', methods=['POST'])
+def add_city():
+    data = json.loads(request.data)
+
+    db = get_db()
+    cursor = db.cursor()
+
+    max_id_query = 'SELECT Max(city_id) FROM city;'
+    city_id = int(cursor.execute(max_id_query).fetchone()[0]) + 1
+
+    insert_query = 'INSERT INTO city (city_id, city, country_id, last_update) VALUES (:city_id, :city_name, :country_id, :update_date);'
+
+    params = {}
+    params['city_name'] = data['city_name']
+    params['country_id'] = data['country_id']
+    params['update_date'] = datetime.now().isoformat(sep=' ')
+    params['city_id'] = city_id
+
+    cursor.execute(insert_query, params).fetchall()
+
+    return str(city_id)
 
 if __name__ == '__main__':
     app.run(debug=True)
