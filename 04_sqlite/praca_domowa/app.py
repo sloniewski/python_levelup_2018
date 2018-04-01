@@ -8,6 +8,7 @@ from flask import (
     Response,
     g,
     request,
+    abort,
 )
 
 
@@ -63,23 +64,36 @@ class PaginationHelper:
         return self.items_per_page * (page_num - 1)
 
 
-def validate_dict(data_dict, *expected_args):
-    error_list = []
-    missing = set(expected_args) - set(data_dict.keys())
-    if len(missing) != 0:
-        error_list.append(
-            'missing data in json {}'.format(
-                str(missing)[1:-1]
-            )
-        )
-    extra = set(data_dict.keys()) - set(expected_args)
-    if len(extra) != 0:
-        error_list.append(
-            'got unexpected data: {}'.format(
-                str(extra)[1:-1]
-            )
-        )
-    return error_list
+@app.errorhandler(400)
+def bad_request(error):
+    return Response(
+        status=400, 
+        response=json.dumps(error.description, indent=4), 
+        headers=[('Content-Type', 'application/json')]
+    )
+
+
+def validate_json(req, *expected_args):
+    def decorator(function):
+        def wrapper():
+            try:
+                data = json.loads(req.data)
+            except json.decoder.JSONDecodeError:
+                abort(400, {'error': 'unable to parse json'})
+
+            missing = set(expected_args) - set(data)
+            if len(missing) != 0:
+                abort(
+                    400, {'error': 'missing data in json: {}'.format(str(missing)[1:-1])})
+
+            extra = set(data) - set(expected_args)
+            if len(extra) != 0:
+                abort(
+                    400, {'error': 'got unexpected data: {}'.format(str(extra)[1:-1])})
+
+            return function()
+        return wrapper
+    return decorator
 
 
 @app.route('/cities', methods=['GET'])
@@ -128,23 +142,9 @@ def cities():
 
 
 @app.route('/cities', methods=['POST'])
+@validate_json(request, 'country_id', 'city_name')
 def add_city():
-    error_list = {'error': []}
-
-    try:
-        data = json.loads(request.data)
-    except json.decoder.JSONDecodeError:
-        data = {}
-        error_list['error'] += ['unable to parse json']
-
-    error_list['error'] += validate_dict(data, 'country_id', 'city_name')
-
-    if error_list['error']:
-        return Response(
-            response=json.dumps(error_list, indent=4),
-            status=400,
-            headers=[('Content-Type', 'application/json')],
-        )
+    data = json.loads(request.data)
 
     db = get_db()
     cursor = db.cursor()
@@ -153,11 +153,7 @@ def add_city():
     country_id_check = cursor.execute(country_id_query, {'country_id': data['country_id']}).fetchone()
 
     if country_id_check is None:
-        return Response(
-            response=json.dumps({'error': ['wrong country_id']}, indent=4),
-            status=400,
-            headers=[('Content-Type', 'application/json')],
-        )
+        abort(400, {'error': ['wrong country_id']})
 
     max_id_query = 'SELECT Max(city_id) FROM city;'
     city_id = int(cursor.execute(max_id_query).fetchone()[0]) + 1
@@ -176,10 +172,11 @@ def add_city():
 
     return Response(
         response=json.dumps({
-            "country_id": params['country_id'],
-            "city_name": params['city_name'],
-            "city_id": city_id
-        }),
+                "country_id": params['country_id'],
+                "city_name": params['city_name'],
+                "city_id": city_id
+            }, 
+            indent=4),
         headers=[('Content-Type', 'application/json')],
         status=201,
     )
@@ -191,11 +188,11 @@ def lang_roles():
     cursor = db.cursor()
 
     query = """
-    Select name, Count(name) FROM (
+      Select name, Count(name) FROM (
             SELECT actor_id, language.name
             FROM film_actor 
-            JOIN film ON film_actor.film_id == film.film_id
-            JOIN language ON film.language_id == language.language_id
+            JOIN film ON film_actor.film_id = film.film_id
+            JOIN language ON film.language_id = language.language_id
         ) Group BY name;
     """
     data = cursor.execute(query).fetchall()
