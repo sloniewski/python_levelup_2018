@@ -64,22 +64,22 @@ class PaginationHelper:
 
 
 def validate_dict(data_dict, *expected_args):
-        error_list = []
-        missing = set(expected_args) - set(data_dict.keys())
-        if len(missing) != 0:
-            error_list.append(
-                'missing data in json {}'.format(
-                    str(missing)[1:-1]
-                )
+    error_list = []
+    missing = set(expected_args) - set(data_dict.keys())
+    if len(missing) != 0:
+        error_list.append(
+            'missing data in json {}'.format(
+                str(missing)[1:-1]
             )
-        extra = set(data_dict.keys()) - set(expected_args)
-        if len(extra) != 0:
-            error_list.append(
-                'got unexpected data: {}'.format(
-                    str(extra)[1:-1]
-                )
+        )
+    extra = set(data_dict.keys()) - set(expected_args)
+    if len(extra) != 0:
+        error_list.append(
+            'got unexpected data: {}'.format(
+                str(extra)[1:-1]
             )
-        return error_list
+        )
+    return error_list
 
 
 @app.route('/cities', methods=['GET'])
@@ -143,6 +143,7 @@ def add_city():
         return Response(
             response=json.dumps(error_list, indent=4),
             status=400,
+            headers=[('Content-Type', 'application/json')],
         )
 
     db = get_db()
@@ -155,6 +156,7 @@ def add_city():
         return Response(
             response=json.dumps({'error': ['wrong country_id']}, indent=4),
             status=400,
+            headers=[('Content-Type', 'application/json')],
         )
 
     max_id_query = 'SELECT Max(city_id) FROM city;'
@@ -178,7 +180,29 @@ def add_city():
             "city_name": params['city_name'],
             "city_id": city_id
         }),
+        headers=[('Content-Type', 'application/json')],
         status=201,
+    )
+
+
+@app.route('/lang_roles', methods=["GET"])
+def lang_roles():
+    db = get_db()
+    cursor = db.cursor()
+
+    query = """
+    Select name, Count(name) FROM (
+            SELECT actor_id, language.name
+            FROM film_actor 
+            JOIN film ON film_actor.film_id == film.film_id
+            JOIN language ON film.language_id == language.language_id
+        ) Group BY name;
+    """
+    data = cursor.execute(query).fetchall()
+
+    return Response(
+        response=json.dumps(data, indent=4),
+        headers=[('Content-Type', 'application/json')]
     )
 
 
