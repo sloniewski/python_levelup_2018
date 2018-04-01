@@ -8,7 +8,6 @@ from flask import (
     request,
 )
 
-from helpers import PaginationHelper
 
 app = Flask(__name__)
 
@@ -29,6 +28,39 @@ def close_connection(exception):
         db.close()
 
 
+def safe_str_to_int(value):
+    if value is None:
+        return None
+    try:
+        value = int(value)
+    except ValueError:
+        return None
+    return value
+
+
+class PaginationHelper:
+
+    def __init__(self, items_count, items_per_page):
+        self.items_count = items_count
+        self.items_per_page = items_per_page
+
+    @property
+    def page_count(self):
+        if self.items_count % self.items_per_page == 0:
+            page_count = self.items_count / self.items_per_page
+        else:
+            page_count = (self.items_count // self.items_per_page) + 1
+        return page_count
+
+    def get_offset_for_page(self, page_num):
+        if page_num <= 1:
+            return 0
+        if page_num > self.page_count:
+            return self.items_per_page * (self.page_count - 1)
+
+        return self.items_per_page * (page_num - 1)
+
+
 @app.route('/cities', methods=['GET'])
 def cities():
     db = get_db()
@@ -45,25 +77,24 @@ def cities():
     query += ' ORDER BY city'
 
     page = request.args.get('page')
+    page = safe_str_to_int(page)
     if page is not None:
-        count_query = 'SELECT Count(*) FROM( {} );'.format(query)
-        count = cursor.execute(count_query, params).fetchone()[0]
 
         per_page = request.args.get('per_page')
+        per_page = safe_str_to_int(per_page)
         if per_page is None:
             per_page = 10
-        else:
-            try:
-                per_page = int(per_page)
-            except ValueError:
-                return Response(response='for oh for',status=404)
 
-        offset = page
+        count_query = 'SELECT Count(*) FROM( {} );'.format(query)
+        count = cursor.execute(count_query, params).fetchone()[0]
+        count = safe_str_to_int(count)
+        paginator = PaginationHelper(items_count=count, items_per_page=per_page)
+        offset = paginator.get_offset_for_page(page_num=page)
 
         query += ' LIMIT :limit OFFSET :offset'
         params['limit'] = per_page
         params['offset'] = offset
-
+    print(params)
     query += ';'
 
     data = cursor.execute(query, params).fetchall()
