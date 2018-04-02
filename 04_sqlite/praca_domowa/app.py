@@ -27,6 +27,13 @@ def get_db():
     return db
 
 
+def dict_factory(cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
+
+
 @app.teardown_appcontext
 def close_connection(exception):
     db = getattr(g, '_database', None)
@@ -153,24 +160,26 @@ def cities():
 
 
 @app.route('/cities', methods=['POST'])
-@jsonify_response(201)
+@jsonify_response(200)
 @validate_json(request, 'country_id', 'city_name')
 def add_city():
     data = json.loads(request.data)
 
     db = get_db()
+    db.row_factory = dict_factory
     cursor = db.cursor()
 
     country_id_query = 'SELECT country_id from country WHERE country_id = :country_id'
     country_id_check = cursor.execute(country_id_query, {'country_id': data['country_id']}).fetchone()
 
     if country_id_check is None:
-        abort(400, {'error': ['wrong country_id']})
+        abort(400, {'error': 'wrong country_id'})
 
     max_id_query = 'SELECT Max(city_id) FROM city;'
-    city_id = int(cursor.execute(max_id_query).fetchone()[0]) + 1
+    city_id = int(cursor.execute(max_id_query).fetchone()['Max(city_id)']) + 1
 
-    insert_query = 'INSERT INTO city (city_id, city, country_id, last_update) VALUES (:city_id, :city_name, :country_id, :update_date);'
+    insert_query = 'INSERT INTO city (city_id, city, country_id, last_update)' \
+                   'VALUES (:city_id, :city_name, :country_id, :update_date);'
 
     params = {
         'city_name': data['city_name'],
@@ -181,11 +190,8 @@ def add_city():
 
     cursor.execute(insert_query, params)
     db.commit()
-
-    return {"country_id": params['country_id'],
-            "city_name": params['city_name'],
-            "city_id": city_id,
-            }
+    
+    return cursor.execute('SELECT * FROM city WHERE city_id = :city_id', {'city_id': city_id}).fetchone()
 
 
 @app.route('/lang_roles', methods=["GET"])
