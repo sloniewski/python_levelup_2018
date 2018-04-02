@@ -5,6 +5,7 @@ from functools import (
 )
 import json
 import sqlite3
+import sys
 
 from flask import (
     Flask,
@@ -17,7 +18,7 @@ from flask import (
 
 app = Flask(__name__)
 
-DATABASE = '/home/maciek/Documents/python_levelup_2018/04_sqlite/praca_domowa/db.sqlite3'
+DATABASE = sys.path[0]+'/db.sqlite3'
 
 
 def get_db():
