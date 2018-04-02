@@ -209,8 +209,7 @@ def lang_roles():
             JOIN language ON film.language_id = language.language_id
         ) Group BY name;
     """
-    data = cursor.execute(query).fetchall()
-    return data
+    return dict(cursor.execute(query).fetchall())
 
 
 if __name__ == '__main__':
