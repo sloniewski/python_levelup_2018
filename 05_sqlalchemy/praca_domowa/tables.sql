@@ -1,3 +1,12 @@
+CREATE DATABASE level_up
+     WITH
+     OWNER = maciek
+     ENCODING = 'UTF8'
+     LC_COLLATE = 'en_GB.UTF-8'
+     LC_CTYPE = 'en_GB.UTF-8'
+     CONNECTION LIMIT = -1
+     TEMPLATE template0;
+
 CREATE TABLE country (
   country_id SMALLINT NOT NULL,
   country VARCHAR(50) NOT NULL,
