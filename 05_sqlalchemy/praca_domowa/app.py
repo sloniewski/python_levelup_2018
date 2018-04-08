@@ -139,5 +139,18 @@ def city_endpoint():
     return sorted(cities_ordered)
 
 
+@app.route('/cities', methods=['POST'])
+@jsonify_response(200)
+@validate_json(request, 'country_id', 'city_name')
+def add_city():
+    data = json.loads(request.data)
+    city = City(
+        country_id=data['country_id'],
+        city_name=data['city_name'],
+    )
+    session.add(city)
+    session.commit()
+    return city
+
 if __name__ == '__main__':
     app.run(debug=True)
