@@ -132,12 +132,11 @@ def validate_json(req, *expected_args):
 @app.route('/cities', methods=['GET'])
 @jsonify_response(200)
 def city_endpoint():
-    cities = session.query(City)
-    cities_ordered = cities.order_by('city')
-    result = []
-    for c in cities_ordered:
-        result.append(c.city)
-    return result
+    cities = session.query(City.city)
+    # cities_ordered = cities.order_by('city') nie sortuje prawidłowo "Abha", "Abu Dhabi", "A Corua (La Corua)" ...
+    cities_ordered = list(map(lambda a: a[0], cities.all()))
+
+    return sorted(cities_ordered)
 
 
 if __name__ == '__main__':
