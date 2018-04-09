@@ -145,7 +145,16 @@ def validate_json(req, *expected_args):
 @app.route('/cities', methods=['GET'])
 @jsonify_response(200)
 def city_endpoint():
-    cities = session.query(City.city)
+
+    country_name = request.args.get('country_name')
+    if country_name is not None:
+        country_id = session.query(Country.country_id).filter(Country.country == country_name).scalar()
+        if country_id is None:
+            abort(404)
+        cities = session.query(City.city).filter(City.country_id == country_id)
+    else:
+        cities = session.query(City.city)
+
     # cities_ordered = cities.order_by('city') nie sortuje prawidłowo "Abha", "Abu Dhabi", "A Corua (La Corua)" ...
     cities_ordered = list(map(lambda a: a[0], cities.all()))
 
