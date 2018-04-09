@@ -15,6 +15,7 @@ from flask import (
 from sqlalchemy import create_engine, Column, Integer, ForeignKey, DateTime, String, SmallInteger
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, relationship
+from sqlalchemy.sql.functions import max
 
 
 #  dialect[+driver]://user:password@host/dbname[?key=value..]
@@ -36,6 +37,18 @@ class City(Base):
 
     country = relationship('Country')
 
+    @property
+    def to_dict(self):
+        city = {
+            'city_id': self.city_id,
+            'city': self.city,
+            'country_id': self.country_id,
+        }
+        return city
+
+    @property
+    def to_json(self):
+        return json.dumps(self.to_dict)
 
 class Country(Base):
     __tablename__ = 'country'
@@ -144,13 +157,20 @@ def city_endpoint():
 @validate_json(request, 'country_id', 'city_name')
 def add_city():
     data = json.loads(request.data)
+    last_id = session.query(max(City.city_id)).scalar()
+    if last_id is None:
+        last_id = 0
+    new_id = last_id + 1
     city = City(
+        city_id=new_id,
         country_id=data['country_id'],
-        city_name=data['city_name'],
+        city=data['city_name'],
+        last_update=datetime.now().isoformat(sep=' ')
     )
     session.add(city)
     session.commit()
-    return city
+    return city.to_dict
+
 
 if __name__ == '__main__':
     app.run(debug=True)
