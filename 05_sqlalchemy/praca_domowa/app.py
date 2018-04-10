@@ -15,12 +15,11 @@ from flask import (
 from sqlalchemy import create_engine, Column, Integer, ForeignKey, DateTime, String, SmallInteger
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, relationship
-from sqlalchemy.sql.functions import max
+from sqlalchemy.sql.functions import max, count
 
+from engine_conf import conf_string
 
-#  dialect[+driver]://user:password@host/dbname[?key=value..]
-engine = create_engine('postgresql://maciek:kalafior01@127.0.0.1/level_up',
-                       encoding='latin1', echo=True)
+engine = create_engine(conf_string)
 
 Base = declarative_base()
 
@@ -50,6 +49,7 @@ class City(Base):
     def to_json(self):
         return json.dumps(self.to_dict)
 
+
 class Country(Base):
     __tablename__ = 'country'
 
@@ -59,11 +59,6 @@ class Country(Base):
 
 
 app = Flask(__name__)
-
-# 1 endpoint /cities - kolejnosc miast alfabetyczna, format json
-# 2 obsługa paramttru /cities?country_name=Poland dla endpoint /cities
-# 4 dodawanie miast POST /cities
-# 5 pagniacja /cities parametry GET /cities?per_page=10&page=2
 
 
 def safe_str_to_int(value):
@@ -79,7 +74,7 @@ def safe_str_to_int(value):
 def jsonify_response(code):
     def decorator(func):
         @wraps(func)
-        def wrapper(*args,**kwargs):
+        def wrapper(*args, **kwargs):
             data = func(*args, **kwargs)
             return Response(
                 status=code,
@@ -155,6 +150,24 @@ def city_endpoint():
     else:
         cities = session.query(City.city)
 
+    page = request.args.get('page')
+    page = safe_str_to_int(page)
+    if page is not None:
+
+        per_page = request.args.get('per_page')
+        per_page = safe_str_to_int(per_page)
+        if per_page is None:
+            per_page = 10
+
+        city_count = session.query(count(City.city_id)).scalar()
+        if city_count is None:
+            city_count = 0
+
+        paginator = PaginationHelper(items_count=city_count, items_per_page=per_page)
+        offset = paginator.get_offset_for_page(page_num=page)
+
+        cities_limited = cities.limit(per_page).offset(offset)
+        cities = cities_limited
     # cities_ordered = cities.order_by('city') nie sortuje prawidłowo "Abha", "Abu Dhabi", "A Corua (La Corua)" ...
     cities_ordered = list(map(lambda a: a[0], cities.all()))
 
@@ -180,6 +193,10 @@ def add_city():
     session.commit()
     return city.to_dict
 
+
+@app.route('/')
+def hello():
+    return 'Hello'
 
 if __name__ == '__main__':
     app.run(debug=True)
